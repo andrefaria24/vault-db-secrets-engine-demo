@@ -9,12 +9,12 @@ GO
 
 -- Create Logins
 USE [master]
-CREATE LOGIN [vault_login] WITH PASSWORD=N'l1ghtsp33d#', DEFAULT_DATABASE=[master]
+CREATE LOGIN [vault_login] WITH PASSWORD=N'<YOUR_PASSWORD>', DEFAULT_DATABASE=[master]
 ALTER SERVER ROLE [sysadmin] ADD MEMBER [vault_login]
 GO
 
 USE [master]
-CREATE LOGIN [vault_static] WITH PASSWORD=N'l1ghtsp33d#', DEFAULT_DATABASE=[master]
+CREATE LOGIN [vault_static] WITH PASSWORD=N'<YOUR_PASSWORD>', DEFAULT_DATABASE=[master]
 GO
 
 -- Create Users
