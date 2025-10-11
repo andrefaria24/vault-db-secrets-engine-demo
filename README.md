@@ -8,7 +8,7 @@ The repo includes a Docker Compose file for local databases and a sample
 
 ## Table of Contents
 - Prerequisites
-- Quick start (recommended)
+- Demo Setup
 - Manual Vault configuration examples (static & dynamic roles)
 - Cleanup
 
@@ -24,9 +24,8 @@ The repo includes a Docker Compose file for local databases and a sample
 
 ---
 
-## Quick start (recommended)
-These steps get the demo running locally with minimal friction. They assume you will provide secrets at runtime instead
-of checking them into the repository.
+## Demo Setup
+These steps get the demo running locally with minimal friction.
 
 1. Clone the repository and change into it:
 
@@ -43,20 +42,7 @@ docker compose up -d
 
 3. Initialize the SQL Server objects securely.
 
-- Option A (recommended): use a local wrapper script that reads passwords from environment variables and calls `sqlcmd`.
-  Example pattern (PowerShell):
-
-```powershell
-$vaultLoginPwd = Read-Host 'Vault login password' -AsSecureString
-$vaultStaticPwd = Read-Host 'Vault static password' -AsSecureString
-
-$loginPlain = [Runtime.InteropServices.Marshal]::PtrToStringBSTR([Runtime.InteropServices.Marshal]::SecureStringToBSTR($vaultLoginPwd))
-$staticPlain = [Runtime.InteropServices.Marshal]::PtrToStringBSTR([Runtime.InteropServices.Marshal]::SecureStringToBSTR($vaultStaticPwd))
-
-sqlcmd -S . -i setup.sql -v VaultLoginPassword="$loginPlain" VaultStaticPassword="$staticPlain"
-```
-
-- Option B: open `setup.sql` in SSMS (Query > SQLCMD Mode) and supply variables with `:setvar` before running.
+- Open `setup.sql` in SSMS (Query > SQLCMD Mode) and replace placeholders like `<YOUR_PASSWORD>` with secure values provided at runtime.
 
 4. Start a Vault dev server for testing:
 
@@ -77,30 +63,25 @@ $env:VAULT_TOKEN = '<ROOT_TOKEN_FROM_DEV_SERVER>'
 vault secrets enable database
 ```
 
----
-
-## Manual Vault configuration examples
-Replace placeholders like `<YOUR_PASSWORD>` with secure values provided at runtime.
-
 ### MSSQL — Static credentials
 Configure the database connection in Vault (static credentials example):
 
 ```powershell
-vault write database/config/mssql_static \
-  plugin_name=mssql-database-plugin \
-  connection_url='sqlserver://{{username}}:{{password}}@localhost:1433' \
-  allowed_roles="mssql_static" \
-  username="vault_login" \
+vault write database/config/mssql_static `
+  plugin_name=mssql-database-plugin `
+  connection_url='sqlserver://{{username}}:{{password}}@localhost:1433' `
+  allowed_roles="mssql_static" `
+  username="vault_login" `
   password="<YOUR_PASSWORD>"
 ```
 
 Create a static role mapping (long rotation period used in demo to emulate static creds):
 
 ```powershell
-vault write database/static-roles/mssql_static \
-  db_name=mssql_static \
-  username="vault_static" \
-  rotation_statements="ALTER LOGIN [{{name}}] WITH PASSWORD = '{{password}}';" \
+vault write database/static-roles/mssql_static `
+  db_name=mssql_static `
+  username="vault_static" `
+  rotation_statements="ALTER LOGIN [{{name}}] WITH PASSWORD = '{{password}}';" `
   rotation_period="876000h"
 ```
 
@@ -114,22 +95,22 @@ vault read database/static-creds/mssql_static
 Configure connection (use a user with privilege to create logins/users):
 
 ```powershell
-vault write database/config/mssql_dynamic \
-  plugin_name=mssql-database-plugin \
-  connection_url='sqlserver://{{username}}:{{password}}@localhost:1433' \
-  allowed_roles="mssql_dynamic" \
-  username="vault_login" \
+vault write database/config/mssql_dynamic `
+  plugin_name=mssql-database-plugin `
+  connection_url='sqlserver://{{username}}:{{password}}@localhost:1433' `
+  allowed_roles="mssql_dynamic" `
+  username="vault_login" `
   password="<YOUR_PASSWORD>"
 ```
 
 Role that creates a temporary login and user with SELECT privileges:
 
 ```powershell
-vault write database/roles/mssql_dynamic \
-  db_name=mssql_dynamic \
-  creation_statements="CREATE LOGIN [{{name}}] WITH PASSWORD = '{{password}}'; USE [test_db_2]; CREATE USER [{{name}}] FOR LOGIN [{{name}}]; GRANT SELECT ON SCHEMA::dbo TO [{{name}}];" \
-  revocation_statements="DROP USER IF EXISTS [{{name}}]; DROP LOGIN IF EXISTS [{{name}}];" \
-  default_ttl="1h" \
+vault write database/roles/mssql_dynamic `
+  db_name=mssql_dynamic `
+  creation_statements="CREATE LOGIN [{{name}}] WITH PASSWORD = '{{password}}'; USE [test_db_2]; CREATE USER [{{name}}] FOR LOGIN [{{name}}]; GRANT SELECT ON SCHEMA::dbo TO [{{name}}];" `
+  revocation_statements="DROP USER IF EXISTS [{{name}}]; DROP LOGIN IF EXISTS [{{name}}];" `
+  default_ttl="1h" `
   max_ttl="24h"
 ```
 
@@ -143,22 +124,22 @@ vault read database/creds/mssql_dynamic
 Configure connection to PostgreSQL (use a privileged account):
 
 ```powershell
-vault write database/config/postgresql_dynamic \
-  plugin_name="postgresql-database-plugin" \
-  allowed_roles="postgresql_dynamic" \
-  connection_url="postgresql://{{username}}:{{password}}@localhost:5432/test_db_1" \
-  username="vault_user" \
-  password="<YOUR_PASSWORD>" \
+vault write database/config/postgresql_dynamic `
+  plugin_name="postgresql-database-plugin" `
+  allowed_roles="postgresql_dynamic" `
+  connection_url="postgresql://{{username}}:{{password}}@localhost:5432/test_db_1" `
+  username="vault_user" `
+  password="<YOUR_PASSWORD>" `
   password_authentication="scram-sha-256"
 ```
 
 Role that creates a temporary PostgreSQL role with SELECT privileges:
 
 ```powershell
-vault write database/roles/postgresql_dynamic \
-  db_name="postgresql_dynamic" \
-  creation_statements="CREATE ROLE \"{{name}}\" WITH LOGIN PASSWORD '{{password}}' VALID UNTIL '{{expiration}}'; GRANT SELECT ON ALL TABLES IN SCHEMA public TO \"{{name}}\";" \
-  default_ttl="1h" \
+vault write database/roles/postgresql_dynamic `
+  db_name="postgresql_dynamic" `
+  creation_statements="CREATE ROLE \"{{name}}\" WITH LOGIN PASSWORD '{{password}}' VALID UNTIL '{{expiration}}'; GRANT SELECT ON ALL TABLES IN SCHEMA public TO \"{{name}}\";" `
+  default_ttl="1h" `
   max_ttl="24h"
 ```
 
